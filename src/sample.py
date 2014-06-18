@@ -30,6 +30,7 @@ import httplib2
 import os
 import sys
 import datetime
+import time
 
 from apiclient import discovery
 from oauth2client import file
@@ -54,11 +55,8 @@ CLIENT_SECRETS = os.path.join(os.path.dirname(__file__), 'client_secrets.json')
 # NEED. For more information on using scopes please see
 # <https://developers.google.com/+/best-practices>.
 FLOW = client.flow_from_clientsecrets(CLIENT_SECRETS,
-  scope=[
-      'https://www.googleapis.com/auth/mapsengine',
-      'https://www.googleapis.com/auth/mapsengine.readonly',
-    ],
-    message=tools.message_if_missing(CLIENT_SECRETS))
+                                      scope=['https://www.googleapis.com/auth/mapsengine'],
+                                      message=tools.message_if_missing(CLIENT_SECRETS))
 
 
 def main(argv):
@@ -80,26 +78,35 @@ def main(argv):
     
     # Construct the service object for the interacting with the Google Maps Engine API.
     service = discovery.build('mapsengine', 'v1', http=http)
+
+    raster_files = [
+        "wdpa_test_raster1.tif",
+        "wdpa_test_raster2.tif",
+        "wdpa_test_raster3.tif"
+    ]
+
+    filenames = []
+    for name in raster_files:
+        filenames.append({
+            "filename": "%s" % name
+        })
     
     fileupload = {
-        #"projectId": "14182859561222861561",
+        "projectId": "04040405428907908306",
         "name": "Test API Upload - Name",
         "description": "Test API Upload - Description",
-        "files": [
-                  { "filename": "wdpa_test_raster1.tif" },
-                  { "filename": "wdpa_test_raster2.tif" },
-                  { "filename": "wdpa_test_raster3.tif" }
-                  ],
+        "files": filenames,
 #         "acquisitionTime": {
 #                             "start": "%s" % datetime.datetime.utcnow(),
 #                             "end": "%s" % datetime.datetime.utcnow(),
 #                             "precision": "second"
 #                             },
         "draftAccessList": "Map Editors",
-        "attribution": "MAP OF LIFE",
+        "attribution": "Copyright MAP OF LIFE",
         "tags": ["testAPIUpload"],
-        "maskType": "autoMask"
-        }
+        "maskType": "autoMask",
+        "rasterType": "image"
+    }
     print fileupload
     try:
         print "Success! Now add code here."
@@ -111,9 +118,56 @@ def main(argv):
 #             print response
             #for raster in response['features']:
             #    print raster
-        request = rasters.upload(fileupload)
+        request = rasters.upload(body=fileupload)
         response = request.execute()
         print response
+        try:
+            rasterUploadId = str(response['id'])
+
+            print "Upload raster id %s" % rasterUploadId
+
+            for name in raster_files:
+                print "Waiting for 2 seconds"
+                time.sleep(2)
+
+                try:
+                    print "Setting up insert request"
+                    freq = rasters.files().insert(id=rasterUploadId,
+                                                  filename=name,
+                                                  media_body=name)
+                    print "Calling insert request"
+                    freq.execute()
+                    print "Finished uploading %s" % name
+                except Exception:
+                    print "Unable to insert '%s'" % name
+
+        except KeyError:
+            print "Error uploading raster files"
+            print response
+
+
+        # now let's add the above dataset to a layer
+        print "Adding data source to a layer"
+        try:
+            layercreate = {
+                "projectId": "04040405428907908306",
+                "id": "04040405428907908306-04203364926419794261",
+                "name": "Test API Layer - name",
+                "description": "Test API Layer - Description",
+                "datasourceType": "image",
+                "draftAccessList": "Map Editors",
+                "datasources": [{
+                    "id": "%s" % rasterUploadId
+                }]
+            }
+            layers = service.layers()
+            lreq = layers.create(body=layercreate, process=True)
+            lres = lreq.execute()
+            print lres
+        except Exception, ex:
+            print "Error adding data source to a new layer"
+            print ex
+
         # Is there an additional page of features to load?
         #request = features.list_next(request, response)
     

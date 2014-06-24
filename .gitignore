@@ -48,4 +48,7 @@ client_secrets.json
 
 # Folders to ignore
 /logs
+/files
+/output
+
 .idea

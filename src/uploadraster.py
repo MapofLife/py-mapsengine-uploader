@@ -80,7 +80,7 @@ def upload(filename, service):
         "files": [{"filename": filename}],
         "draftAccessList": "Map Editors",
         "attribution": "Copyright MAP OF LIFE",
-        "tags": ["testAPI1000",parkID],
+        "tags": ["WDPA_2014_API_Upload","batch_2132-20000",parkID],
         "maskType": "autoMask",
         "rasterType": "image"
     }

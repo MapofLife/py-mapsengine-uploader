@@ -45,6 +45,7 @@ docs/_build/
 
 #Google API Credentials
 client_secrets.json
+sample.dat
 
 # Folders to ignore
 /logs

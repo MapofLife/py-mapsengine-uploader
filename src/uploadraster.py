@@ -43,12 +43,18 @@ from oauth2client import tools
 from os import listdir
 from os.path import isfile, join
 
+######
+# Maps Engine Status
+# Uploading: means the container has been created, but the upload of the image failed
+# Processing: search for status "Is ready to process" and "Is being processed" will return images with this status
+# Image was Processed: search for "Was processed" will return images with this status
+######
+
 # Parser for command-line arguments.
 parser = argparse.ArgumentParser(
     description=__doc__,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     parents=[tools.argparser])
-
 
 # CLIENT_SECRETS is name of a file containing the OAuth 2.0 information for this
 # application, including client_id and client_secret. You can see the Client ID
@@ -64,14 +70,25 @@ FLOW = client.flow_from_clientsecrets(CLIENT_SECRETS,
                                       scope=['https://www.googleapis.com/auth/mapsengine'],
                                       message=tools.message_if_missing(CLIENT_SECRETS))
 DATA_FOLDER = "files"
-PROCESSED = "processed"
+CONTAINER_FOLDER = DATA_FOLDER + "/container_created"
+UPLOADED_FOLDER = DATA_FOLDER + "/uploaded"
 OUTPUT = "output"
+NOT_STARTED_CODE = 0
+CONTAINER_CODE = 1
+UPLOADED_CODE = 2
+NOT_STARTED_FILE = OUTPUT + "/" + "not_started.csv"
+CONTAINER_FILE = OUTPUT + "/" + "container.csv"
+UPLOADED_FILE = OUTPUT + "/" + "uploaded.csv"
 
 def upload(filename, service):
-    time.sleep(1)
-    path = "%s/%s" % (DATA_FOLDER,filename)
-    #file name is always prefixed with: wdpa2014_id and then the park id
+    #file name is always prefixed with: wdpa2014_id and then the park id    
     parkID = os.path.splitext(filename)[0][11:]
+    
+    ret = {'code': NOT_STARTED_CODE,
+           'assetid': None,
+           'parkid': parkID}
+    
+    path = "%s/%s" % (DATA_FOLDER,filename)    
 
     fileupload = {
         "projectId": "04040405428907908306",
@@ -80,56 +97,55 @@ def upload(filename, service):
         "files": [{"filename": filename}],
         "draftAccessList": "Map Editors",
         "attribution": "Copyright MAP OF LIFE",
-        "tags": ["WDPA_2014_API_Upload","batch_2132-20000",parkID],
+        "tags": ["WDPA_2014_API_Upload","testAPI",parkID],
         "maskType": "autoMask",
         "rasterType": "image"
     }
 
     #tags: testAPI, testAPI1000
+    rasters = service.rasters()        
+    request = rasters.upload(body=fileupload)
     
     try:
-
-        rasters = service.rasters()
-        #create the skeleton container, which we'll upload the tif file to
-        request = rasters.upload(body=fileupload)
-        response = request.execute()
+        time.sleep(1) #need to wait 1 sec due to api rate limits
+        response = request.execute() #create the skeleton container, which we'll upload the tif file to
+        rasterUploadId = str(response['id'])
+        
+        ret['code'] = CONTAINER_CODE
+        ret['assetid'] = rasterUploadId
+             
+        logging.info("%s: PARTIAL SUCCESS: Finished creating asset container. Asset id is %s" % (filename,rasterUploadId))        
 
         try:
-            rasterUploadId = str(response['id'])
+            freq = rasters.files().insert(id=rasterUploadId,
+                                          filename=filename,
+                                          media_body=path)
+            time.sleep(1) #need to wait 1 sec due to api rate limits
+            freq.execute()
+            logging.info("%s: SUCCESS: Finished uploading" % filename)
+            ret['code'] = UPLOADED_CODE
             
-            logging.info("Upload raster id %s" % rasterUploadId)
+        except Exception:
+            logging.error("%s: FAILURE: Error uploading" % filename)
+            logging.error(sys.exc_info()[0])
+            logging.error(traceback.format_exc())
+            return ret
 
-            time.sleep(1)
-
-            try:
-                freq = rasters.files().insert(id=rasterUploadId,
-                                              filename=filename,
-                                              media_body=path)
-                freq.execute()
-                logging.info("Finished uploading %s" % filename)
-            except Exception:
-                logging.error("Unable to insert '%s'" % filename)
-                logging.error(sys.exc_info()[0])
-                logging.error(traceback.format_exc())
-                return False
-
-        except KeyError:
-            logging.error("Error uploading raster files")
-            logging.error(response)
-            return False
+    except KeyError:
+        logging.error("%s: FAILURE: Error creating asset container files" % filename)
+        logging.error(response)
+        logging.error(sys.exc_info()[0])
+        logging.error(traceback.format_exc())
+        return ret
     
     except client.AccessTokenRefreshError:
         logging.error("The credentials have been revoked or expired, please re-run"
           "the application to re-authorize")
-        return False
-    
-    #write out this rasterID to a file, this should be the EE id.  also include the park id
-    with open('%s/uploaded.csv' % OUTPUT, 'a') as csvfile:
-        writer = csv.writer(csvfile, delimiter=',',
-                            quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
-        writer.writerow([filename,parkID,rasterUploadId])
-        
-    return True
+        logging.error(sys.exc_info()[0])
+        logging.error(traceback.format_exc())
+        return ret
+           
+    return ret
 #end upload function
 
 def main(argv):
@@ -139,8 +155,9 @@ def main(argv):
     logging.basicConfig(filename='logs/runlog.txt',level=logging.DEBUG, filemode='w', datefmt='%Y-%m-%d %H:%M:%S')
     
     #clear the contents of output files
-    open('%s/retry.txt' % OUTPUT, 'w').close()
-    open('%s/uploaded.csv' % OUTPUT,'w').close()
+    open(NOT_STARTED_FILE, 'w').close()
+    open(CONTAINER_FILE,'w').close()
+    open(UPLOADED_FILE,'w').close()
     
     # If the credentials don't exist or are invalid run through the native client
     # flow. The Storage object will ensure that if successful the good
@@ -164,21 +181,44 @@ def main(argv):
     for f in files:
         try:
             logging.info("Starting upload for %s" % f)
-            success = upload(f,service)
-            if success:
-                msg = "SUCCESS: %s" % f
-                print(msg)
-                logging.info(msg)
+            result = upload(f,service)
+            
+            if result['code'] == NOT_STARTED_CODE:
+                msg = "%s: FAILURE: Not Started" % f
+                outputFile = NOT_STARTED_FILE
+   
+            elif result['code'] == CONTAINER_CODE:
+                msg = "%s: PARTIAL FAILURE: Asset container created but file not uploaded" % f
+                #move the file to a different folder so that it is easy to reprocess
+                shutil.move("%s/%s" % (DATA_FOLDER,f), "%s/%s" % (CONTAINER_FOLDER,f))
+                outputFile = CONTAINER_FILE
+                
+            elif result['code'] == UPLOADED_CODE:
+                msg = "%s: SUCCESS: Uploaded Successfully" % f
                 #move the file to the "processed" folder
-                shutil.move("%s/%s" % (DATA_FOLDER,f), "%s/%s/%s" % (DATA_FOLDER,PROCESSED,f))
-            else:
-                msg = "FAILURE: %s" % f
-                print(msg)
-                logging.error(msg)
-                with open("%s/retry.txt" % OUTPUT, "a") as myfile:
-                    myfile.write(f)
+                shutil.move("%s/%s" % (DATA_FOLDER,f), "%s/%s" % (UPLOADED_FOLDER,f))
+                outputFile = UPLOADED_FILE
+            
+            with open(outputFile, 'a') as csvfile:
+                    writer = csv.writer(csvfile, delimiter=',',
+                                        quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+                    writer.writerow([f,result['parkid'],result['assetid']]) 
+                    
+            print(msg)
+            logging.info(msg)
+            
         except:
-            logging.error("Critical Error %s" % f)
+            msg = "%s: Critical Error" % f
+            print msg
+            logging.error(msg)
+            logging.error(sys.exc_info()[0])
+            logging.error(traceback.format_exc())
+    #end for
+    
+    msg = "Script Completed"
+    print msg
+    logging.info(msg)
+# end main function
 
 # For more information on the Google Maps Engine API you can visit:
 #

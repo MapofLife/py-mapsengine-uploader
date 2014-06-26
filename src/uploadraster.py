@@ -79,6 +79,7 @@ UPLOADED_CODE = 2
 NOT_STARTED_FILE = OUTPUT + "/" + "not_started.csv"
 CONTAINER_FILE = OUTPUT + "/" + "container.csv"
 UPLOADED_FILE = OUTPUT + "/" + "uploaded.csv"
+WAIT = 10
 
 def upload(filename, service):
     #file name is always prefixed with: wdpa2014_id and then the park id    
@@ -97,7 +98,7 @@ def upload(filename, service):
         "files": [{"filename": filename}],
         "draftAccessList": "Map Editors",
         "attribution": "Copyright MAP OF LIFE",
-        "tags": ["WDPA_2014_API_Upload","batch_2132-20000_2",parkID],
+        "tags": ["WDPA_2014_API_Upload","batch_2132-20000_3",parkID],
         "maskType": "autoMask",
         "rasterType": "image"
     }
@@ -107,7 +108,7 @@ def upload(filename, service):
     request = rasters.upload(body=fileupload)
     
     try:
-        time.sleep(1) #need to wait 1 sec due to api rate limits
+        time.sleep(WAIT) #need to wait  due to api rate limits
         response = request.execute() #create the skeleton container, which we'll upload the tif file to
         rasterUploadId = str(response['id'])
         
@@ -120,7 +121,7 @@ def upload(filename, service):
             freq = rasters.files().insert(id=rasterUploadId,
                                           filename=filename,
                                           media_body=path)
-            time.sleep(1) #need to wait 1 sec due to api rate limits
+            time.sleep(WAIT) #need to wait  due to api rate limits
             freq.execute()
             logging.info("%s: SUCCESS: Finished uploading" % filename)
             ret['code'] = UPLOADED_CODE

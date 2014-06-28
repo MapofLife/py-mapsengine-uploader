@@ -79,7 +79,7 @@ UPLOADED_CODE = 2
 NOT_STARTED_FILE = OUTPUT + "/" + "not_started.csv"
 CONTAINER_FILE = OUTPUT + "/" + "container.csv"
 UPLOADED_FILE = OUTPUT + "/" + "uploaded.csv"
-WAIT = 10
+WAIT = 5 #number of seconds to wait before any api call
 
 def upload(filename, service):
     #file name is always prefixed with: wdpa2014_id and then the park id    

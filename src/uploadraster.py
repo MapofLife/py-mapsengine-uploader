@@ -70,6 +70,7 @@ FLOW = client.flow_from_clientsecrets(CLIENT_SECRETS,
                                       scope=['https://www.googleapis.com/auth/mapsengine'],
                                       message=tools.message_if_missing(CLIENT_SECRETS))
 DATA_FOLDER = "files"
+TO_UPLOAD_FOLDER = DATA_FOLDER + "/to_upload"
 CONTAINER_FOLDER = DATA_FOLDER + "/container_created"
 UPLOADED_FOLDER = DATA_FOLDER + "/uploaded"
 OUTPUT = "output"
@@ -81,6 +82,10 @@ CONTAINER_FILE = OUTPUT + "/" + "container.csv"
 UPLOADED_FILE = OUTPUT + "/" + "uploaded.csv"
 WAIT = 5 #number of seconds to wait before any api call
 
+ts = time.time()
+st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d_%Hh%Mm')
+batchID = "batchID_" + st
+
 def upload(filename, service):
     #file name is always prefixed with: wdpa2014_id and then the park id    
     parkID = os.path.splitext(filename)[0][11:]
@@ -89,7 +94,7 @@ def upload(filename, service):
            'assetid': None,
            'parkid': parkID}
     
-    path = "%s/%s" % (DATA_FOLDER,filename)    
+    path = "%s/%s" % (TO_UPLOAD_FOLDER,filename)    
 
     fileupload = {
         "projectId": "04040405428907908306",
@@ -98,7 +103,7 @@ def upload(filename, service):
         "files": [{"filename": filename}],
         "draftAccessList": "Map Editors",
         "attribution": "Copyright MAP OF LIFE",
-        "tags": ["WDPA_2014_API_Upload","batch_2132-20000_3",parkID],
+        "tags": ["WDPA_2014_API_Upload",batchID,parkID], #,"testAPI" # add this tag when testing
         "maskType": "autoMask",
         "rasterType": "image"
     }
@@ -156,9 +161,9 @@ def main(argv):
     logging.basicConfig(filename='logs/runlog.txt',level=logging.DEBUG, filemode='w', datefmt='%Y-%m-%d %H:%M:%S')
     
     #clear the contents of output files
-    open(NOT_STARTED_FILE, 'w').close()
-    open(CONTAINER_FILE,'w').close()
-    open(UPLOADED_FILE,'w').close()
+    #open(NOT_STARTED_FILE, 'w').close()
+    #open(CONTAINER_FILE,'w').close()
+    #open(UPLOADED_FILE,'w').close()
     
     # If the credentials don't exist or are invalid run through the native client
     # flow. The Storage object will ensure that if successful the good
@@ -177,7 +182,7 @@ def main(argv):
     service = discovery.build('mapsengine', 'v1', http=http)
 
     #files = ["wdpa2014_id4336.tif"]
-    files = [ f for f in listdir(DATA_FOLDER) if isfile(join(DATA_FOLDER,f)) ]
+    files = [ f for f in listdir(TO_UPLOAD_FOLDER) if isfile(join(TO_UPLOAD_FOLDER,f)) ]
     
     for f in files:
         try:
@@ -191,19 +196,19 @@ def main(argv):
             elif result['code'] == CONTAINER_CODE:
                 msg = "%s: PARTIAL FAILURE: Asset container created but file not uploaded" % f
                 #move the file to a different folder so that it is easy to reprocess
-                shutil.move("%s/%s" % (DATA_FOLDER,f), "%s/%s" % (CONTAINER_FOLDER,f))
+                shutil.move("%s/%s" % (TO_UPLOAD_FOLDER,f), "%s/%s" % (CONTAINER_FOLDER,f))
                 outputFile = CONTAINER_FILE
                 
             elif result['code'] == UPLOADED_CODE:
                 msg = "%s: SUCCESS: Uploaded Successfully" % f
                 #move the file to the "processed" folder
-                shutil.move("%s/%s" % (DATA_FOLDER,f), "%s/%s" % (UPLOADED_FOLDER,f))
+                shutil.move("%s/%s" % (TO_UPLOAD_FOLDER,f), "%s/%s" % (UPLOADED_FOLDER,f))
                 outputFile = UPLOADED_FILE
             
             with open(outputFile, 'a') as csvfile:
                     writer = csv.writer(csvfile, delimiter=',',
                                         quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
-                    writer.writerow([f,result['parkid'],result['assetid']]) 
+                    writer.writerow([f,result['parkid'],result['assetid'],batchID]) 
                     
             print(msg)
             logging.info(msg)

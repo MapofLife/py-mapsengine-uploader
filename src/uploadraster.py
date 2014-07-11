@@ -80,7 +80,7 @@ UPLOADED_CODE = 2
 NOT_STARTED_FILE = OUTPUT + "/" + "not_started.csv"
 CONTAINER_FILE = OUTPUT + "/" + "container.csv"
 UPLOADED_FILE = OUTPUT + "/" + "uploaded.csv"
-WAIT = 4 #number of seconds to wait before any api call
+WAIT = 5 #number of seconds to wait before any api call
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d_%Hh%Mm')

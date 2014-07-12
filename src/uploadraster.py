@@ -213,7 +213,7 @@ def main(argv):
             print(msg)
             logging.info(msg)
             
-        except:
+        except Exception:
             msg = "%s: Critical Error" % f
             print msg
             logging.error(msg)

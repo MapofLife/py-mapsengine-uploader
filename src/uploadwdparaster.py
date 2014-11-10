@@ -86,71 +86,59 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d_%Hh%Mm')
 batchID = "batchID_" + st
 
-###
-# upload the raster to maps engine
-#
-# service: the mapsengine api service (see service() function)
-# filename: the full path to the file
-# tags: a list of tags
-
-def upload(service, filepath, uploadsettings):
+def upload(filename, service):
     #file name is always prefixed with: wdpa2014_id and then the park id    
-    #parkID = os.path.splitext(filepath)[0][11:]
+    parkID = os.path.splitext(filename)[0][11:]
     
-    #filepath contains the full path to the file, including the filename
-    #fname will have just the file name, with the extension (last 4 chars) stripped off.
-    fname = os.path.split(filepath)[1]
-
     ret = {'code': NOT_STARTED_CODE,
-           'assetid': None #,
-           #'parkid': parkID}
-           }
+           'assetid': None,
+           'parkid': parkID}
     
-    #path = "%s/%s" % (TO_UPLOAD_FOLDER,filepath)    
+    path = "%s/%s" % (TO_UPLOAD_FOLDER,filename)    
 
     fileupload = {
         "projectId": "04040405428907908306",
-        "name": uploadsettings['name'], #os.path.splitext(filepath)[0]
-        "description": uploadsettings['description'],
-        "files": [{"filename": fname}],
+        "name": os.path.splitext(filename)[0],
+        "description": "WDPA 2014 Rasterization",
+        "files": [{"filename": filename}],
         "draftAccessList": "Map Editors",
         "attribution": "Copyright MAP OF LIFE",
-        "tags": uploadsettings['tags'],
+        "tags": ["WDPA_2014_API_Upload",batchID,parkID], #,"testAPI" # add this tag when testing
         "maskType": "autoMask",
         "rasterType": "image"
     }
 
+    #tags: testAPI, testAPI1000
     rasters = service.rasters()        
     request = rasters.upload(body=fileupload)
     
     try:
         time.sleep(WAIT) #need to wait  due to api rate limits
         response = request.execute() #create the skeleton container, which we'll upload the tif file to
-        print response
         rasterUploadId = str(response['id'])
         
         ret['code'] = CONTAINER_CODE
         ret['assetid'] = rasterUploadId
              
-        logging.info("%s: PARTIAL SUCCESS: Finished creating asset container. Asset id is %s" % (fname,rasterUploadId))        
+        logging.info("%s: PARTIAL SUCCESS: Finished creating asset container. Asset id is %s" % (filename,rasterUploadId))        
 
         try:
             freq = rasters.files().insert(id=rasterUploadId,
-                                          filename=fname,
-                                          media_body=filepath)
+                                          filename=filename,
+                                          media_body=path)
             time.sleep(WAIT) #need to wait  due to api rate limits
             freq.execute()
-            logging.info("%s: SUCCESS: Finished uploading" % fname)
+            logging.info("%s: SUCCESS: Finished uploading" % filename)
             ret['code'] = UPLOADED_CODE
             
         except Exception:
-            logging.error("%s: FAILURE: Error uploading" % fname)
+            logging.error("%s: FAILURE: Error uploading" % filename)
             logging.error(sys.exc_info()[0])
             logging.error(traceback.format_exc())
             return ret
 
     except KeyError:
-        logging.error("%s: FAILURE: Error creating asset container files" % filepath)
+        logging.error("%s: FAILURE: Error creating asset container files" % filename)
         logging.error(response)
         logging.error(sys.exc_info()[0])
         logging.error(traceback.format_exc())
@@ -165,35 +153,6 @@ def upload(service, filepath, uploadsettings):
            
     return ret
 #end upload function
-
-def service():
-        # Parse the command-line flags.
-    #flags = parser.parse_args(argv[1:])
-    flags = None
-
-    #clear the contents of output files
-    #open(NOT_STARTED_FILE, 'w').close()
-    #open(CONTAINER_FILE,'w').close()
-    #open(UPLOADED_FILE,'w').close()
-    
-    # If the credentials don't exist or are invalid run through the native client
-    # flow. The Storage object will ensure that if successful the good
-    # credentials will get written back to the file.
-    storage = file.Storage('sample.dat')
-    credentials = storage.get()
-    if credentials is None or credentials.invalid:
-        credentials = tools.run_flow(FLOW, storage, flags)
-    
-    # Create an httplib2.Http object to handle our HTTP requests and authorize it
-    # with our good Credentials.
-    http = httplib2.Http()
-    http = credentials.authorize(http)
-    
-    # Construct the service object for the interacting with the Google Maps Engine API.
-    service = discovery.build('mapsengine', 'v1', http=http)
-    
-    return service
-#end service function
 
 def main(argv):
     # Parse the command-line flags.

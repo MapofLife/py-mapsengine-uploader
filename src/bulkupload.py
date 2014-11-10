@@ -22,6 +22,7 @@ _DIR = Config.get('Settings','RasterDirectory')
 _TAGS = Config.get('Settings','Tags').split(",")
 _EMAIL = Config.get('Settings','Email')
 _DESCRIPTION = Config.get('Settings','Description')
+_USER_ACCESS_ID = Config.get('Settings','UserAccessID')
 
 NOT_STARTED_CODE = 0
 CONTAINER_CODE = 1
@@ -45,7 +46,8 @@ def main(argv):
 
         uploadsettings = {'name':f[:-4],
                           'description': _DESCRIPTION,
-                          'tags':tags}
+                          'tags':tags,
+                          'userAccessID': _USER_ACCESS_ID}
         try:
             logging.info("Starting upload for %s" % f)
             #tags = uploaded:ben.s.carlson@gmail.com:11/5/14, env-annotate, worldclim_tmin_10min_01

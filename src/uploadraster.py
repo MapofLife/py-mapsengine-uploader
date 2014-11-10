@@ -149,6 +149,30 @@ def upload(service, filepath, uploadsettings):
             logging.error(traceback.format_exc())
             return ret
 
+        try:
+            #see api defintion here
+            #API Docs: https://developers.google.com/maps-engine/documentation/reference/v1/Permission
+            #Python API Docs: https://developers.google.com/resources/api-libraries/documentation/mapsengine/v1/python/latest/mapsengine_v1.rasters.permissions.html#batchUpdate
+            #TODO: haven't tested this code!
+            permissionsBody = {"permissions": [
+                                    {
+                                     "role": "reader",
+                                     "type": "user",
+                                     "discoverable": True,
+                                     "id": uploadsettings['userAccessID']
+                                    }
+                                  ]
+                                 }
+            
+            rasters.permissions().batchUpdate(id=rasterUploadId,
+                                              body=permissionsBody)
+        except Exception:
+            logging.error("%s: FAILURE: Adding permissions to raster" % filepath)
+            logging.error(response)
+            logging.error(sys.exc_info()[0])
+            logging.error(traceback.format_exc())
+            return ret
+            
     except KeyError:
         logging.error("%s: FAILURE: Error creating asset container files" % filepath)
         logging.error(response)

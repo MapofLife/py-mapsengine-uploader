@@ -43,13 +43,6 @@ from oauth2client import tools
 from os import listdir
 from os.path import isfile, join
 
-######
-# Maps Engine Status
-# Uploading: means the container has been created, but the upload of the image failed
-# Processing: search for status "Is ready to process" and "Is being processed" will return images with this status
-# Image was Processed: search for "Was processed" will return images with this status
-######
-
 # Parser for command-line arguments.
 parser = argparse.ArgumentParser(
     description=__doc__,
@@ -69,22 +62,23 @@ CLIENT_SECRETS = os.path.join(os.path.dirname(__file__), 'client_secrets.json')
 FLOW = client.flow_from_clientsecrets(CLIENT_SECRETS,
                                       scope=['https://www.googleapis.com/auth/mapsengine'],
                                       message=tools.message_if_missing(CLIENT_SECRETS))
-DATA_FOLDER = "files"
-TO_UPLOAD_FOLDER = DATA_FOLDER + "/to_upload"
-CONTAINER_FOLDER = DATA_FOLDER + "/container_created"
-UPLOADED_FOLDER = DATA_FOLDER + "/uploaded"
-OUTPUT = "output"
+#DATA_FOLDER = "files"
+#TO_UPLOAD_FOLDER = DATA_FOLDER + "/to_upload"
+#CONTAINER_FOLDER = DATA_FOLDER + "/container_created"
+#UPLOADED_FOLDER = DATA_FOLDER + "/uploaded"
+#OUTPUT = "output"
 NOT_STARTED_CODE = 0
 CONTAINER_CODE = 1
 UPLOADED_CODE = 2
-NOT_STARTED_FILE = OUTPUT + "/" + "not_started.csv"
-CONTAINER_FILE = OUTPUT + "/" + "container.csv"
-UPLOADED_FILE = OUTPUT + "/" + "uploaded.csv"
-WAIT = 5 #number of seconds to wait before any api call
+PERMISSION_CODE = 3
+#NOT_STARTED_FILE = OUTPUT + "/" + "not_started.csv"
+#CONTAINER_FILE = OUTPUT + "/" + "container.csv"
+#UPLOADED_FILE = OUTPUT + "/" + "uploaded.csv"
+
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d_%Hh%Mm')
-batchID = "batchID_" + st
+#batchID = "batchID_" + st
 
 ###
 # upload the raster to maps engine
@@ -123,56 +117,18 @@ def upload(service, filepath, uploadsettings):
     rasters = service.rasters()        
     request = rasters.upload(body=fileupload)
     
+    #firs try to create the asset container
     try:
-        time.sleep(WAIT) #need to wait  due to api rate limits
+        time.sleep(uploadsettings['apiWait']) #need to wait  due to api rate limits
         response = request.execute() #create the skeleton container, which we'll upload the tif file to
-        print response
+
         rasterUploadId = str(response['id'])
         
         ret['code'] = CONTAINER_CODE
         ret['assetid'] = rasterUploadId
              
-        logging.info("%s: PARTIAL SUCCESS: Finished creating asset container. Asset id is %s" % (fname,rasterUploadId))        
+        logging.info("%s: PARTIAL SUCCESS: Finished creating asset container. Asset id is %s" % (fname,rasterUploadId))
 
-        try:
-            freq = rasters.files().insert(id=rasterUploadId,
-                                          filename=fname,
-                                          media_body=filepath)
-            time.sleep(WAIT) #need to wait  due to api rate limits
-            freq.execute()
-            logging.info("%s: SUCCESS: Finished uploading" % fname)
-            ret['code'] = UPLOADED_CODE
-            
-        except Exception:
-            logging.error("%s: FAILURE: Error uploading" % fname)
-            logging.error(sys.exc_info()[0])
-            logging.error(traceback.format_exc())
-            return ret
-
-        try:
-            #see api defintion here
-            #API Docs: https://developers.google.com/maps-engine/documentation/reference/v1/Permission
-            #Python API Docs: https://developers.google.com/resources/api-libraries/documentation/mapsengine/v1/python/latest/mapsengine_v1.rasters.permissions.html#batchUpdate
-            #TODO: haven't tested this code!
-            permissionsBody = {"permissions": [
-                                    {
-                                     "role": "reader",
-                                     "type": "user",
-                                     "discoverable": True,
-                                     "id": uploadsettings['userAccessID']
-                                    }
-                                  ]
-                                 }
-            
-            rasters.permissions().batchUpdate(id=rasterUploadId,
-                                              body=permissionsBody)
-        except Exception:
-            logging.error("%s: FAILURE: Adding permissions to raster" % filepath)
-            logging.error(response)
-            logging.error(sys.exc_info()[0])
-            logging.error(traceback.format_exc())
-            return ret
-            
     except KeyError:
         logging.error("%s: FAILURE: Error creating asset container files" % filepath)
         logging.error(response)
@@ -183,6 +139,52 @@ def upload(service, filepath, uploadsettings):
     except client.AccessTokenRefreshError:
         logging.error("The credentials have been revoked or expired, please re-run"
           "the application to re-authorize")
+        logging.error(sys.exc_info()[0])
+        logging.error(traceback.format_exc())
+        return ret
+    
+    #next upload the file
+    try:
+        freq = rasters.files().insert(id=rasterUploadId,
+                                      filename=fname,
+                                      media_body=filepath)
+        time.sleep(uploadsettings['apiWait']) #need to wait  due to api rate limits
+        freq.execute()
+        logging.info("%s: SUCCESS: Finished uploading" % fname)
+        ret['code'] = UPLOADED_CODE
+        
+    except Exception:
+        logging.error("%s: FAILURE: Error uploading" % fname)
+        logging.error(sys.exc_info()[0])
+        logging.error(traceback.format_exc())
+        return ret
+
+    #finally, add access permissions
+    try:
+        #see api defintion here
+        #API Docs: https://developers.google.com/maps-engine/documentation/reference/v1/Permission
+        #Python API Docs: https://developers.google.com/resources/api-libraries/documentation/mapsengine/v1/python/latest/mapsengine_v1.rasters.permissions.html#batchUpdate
+        #TODO: haven't tested this code!
+        permissionsBody = {"permissions": [
+                                {
+                                 "role": "reader",
+                                 "type": "user",
+                                 "discoverable": True,
+                                 "id": uploadsettings['userAccessID']
+                                }
+                              ]
+                             }
+        
+        #request = rasters.permissions().batchUpdate(id=rasterUploadId,
+         #                                 body=permissionsBody)
+        #time.sleep(uploadsettings['apiWait']) #need to wait due to api rate limits
+        #request.execute()
+        #logging.info("%s: PARTIAL SUCCESS: Permissions Set" % fname)
+        #ret['code'] = PERMISSION_CODE
+        
+    except Exception:
+        logging.error("%s: FAILURE: Adding permissions to raster" % filepath)
+        logging.error(response)
         logging.error(sys.exc_info()[0])
         logging.error(traceback.format_exc())
         return ret

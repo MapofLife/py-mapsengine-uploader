@@ -13,6 +13,7 @@ import ConfigParser
 import traceback
 import datetime
 import csv
+import shutil
 
 Config = ConfigParser.ConfigParser()
 #get run configurations
@@ -29,6 +30,8 @@ _RUN_LOG_PATH = Config.get('Settings','RunLogPath')
 #Internal constats
 _EEIDS_FILE = 'eeids.csv'
 _RUN_LOG_FILE = 'runlog.txt'
+_CONTAINER_FOLDER = '%s/%s' % (_DIR,'container')
+_UPLOADED_FOLDER = '%s/%s' % (_DIR,'uploaded')
 
 ######
 # Maps Engine Status
@@ -84,7 +87,9 @@ def main(argv):
             elif result['code'] == CONTAINER_CODE:
                 msg = "%s: PARTIAL FAILURE: Asset container created but file not uploaded" % f
                 #move the file to a different folder so that it is easy to reprocess
-                #shutil.move("%s/%s" % (TO_UPLOAD_FOLDER,f), "%s/%s" % (CONTAINER_FOLDER,f))
+                if not os.path.exists(_CONTAINER_FOLDER):
+                    os.makedirs(_CONTAINER_FOLDER)
+                shutil.move("%s/%s" % (_DIR,f), "%s/%s" % (_CONTAINER_FOLDER,f))
                 #outputFile = CONTAINER_FILE
             elif result['code'] == PERMISSION_CODE:
                 msg = "%s: PARTIAL FAILURE: File uploaded but permissions not set on asset" % f
@@ -92,7 +97,9 @@ def main(argv):
             elif result['code'] == UPLOADED_CODE:
                 msg = "%s: SUCCESS: Uploaded Successfully" % f
                 #move the file to the "processed" folder
-                #shutil.move("%s/%s" % (TO_UPLOAD_FOLDER,f), "%s/%s" % (UPLOADED_FOLDER,f))
+                if not os.path.exists(_UPLOADED_FOLDER):
+                    os.makedirs(_UPLOADED_FOLDER)
+                shutil.move("%s/%s" % (_DIR,f), "%s/%s" % (_UPLOADED_FOLDER,f))
                 #outputFile = UPLOADED_FILE
             
             with open(eeidsfile, 'a') as csvfile:

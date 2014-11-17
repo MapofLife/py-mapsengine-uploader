@@ -160,34 +160,34 @@ def upload(service, filepath, uploadsettings):
         return ret
 
     #finally, add access permissions
-    try:
+#     try:
         #see api defintion here
         #API Docs: https://developers.google.com/maps-engine/documentation/reference/v1/Permission
         #Python API Docs: https://developers.google.com/resources/api-libraries/documentation/mapsengine/v1/python/latest/mapsengine_v1.rasters.permissions.html#batchUpdate
         #TODO: haven't tested this code!
-        permissionsBody = {"permissions": [
-                                {
-                                 "role": "reader",
-                                 "type": "user",
-                                 "discoverable": True,
-                                 "id": uploadsettings['userAccessID']
-                                }
-                              ]
-                             }
+#         permissionsBody = {"permissions": [
+#                                 {
+#                                  "role": "reader",
+#                                  "type": "user",
+#                                  "discoverable": True,
+#                                  "id": uploadsettings['userAccessID']
+#                                 }
+#                               ]
+#                              }
         
         #request = rasters.permissions().batchUpdate(id=rasterUploadId,
-         #                                 body=permissionsBody)
+        #                                 body=permissionsBody)
         #time.sleep(uploadsettings['apiWait']) #need to wait due to api rate limits
         #request.execute()
         #logging.info("%s: PARTIAL SUCCESS: Permissions Set" % fname)
         #ret['code'] = PERMISSION_CODE
         
-    except Exception:
-        logging.error("%s: FAILURE: Adding permissions to raster" % filepath)
-        logging.error(response)
-        logging.error(sys.exc_info()[0])
-        logging.error(traceback.format_exc())
-        return ret
+#     except Exception:
+#         logging.error("%s: FAILURE: Adding permissions to raster" % filepath)
+#         logging.error(response)
+#         logging.error(sys.exc_info()[0])
+#         logging.error(traceback.format_exc())
+#         return ret
            
     return ret
 #end upload function
@@ -221,76 +221,76 @@ def service():
     return service
 #end service function
 
-def main(argv):
-    # Parse the command-line flags.
-    flags = parser.parse_args(argv[1:])
-    
-    logging.basicConfig(filename='logs/runlog.txt',level=logging.DEBUG, filemode='w', datefmt='%Y-%m-%d %H:%M:%S')
-    
-    #clear the contents of output files
-    #open(NOT_STARTED_FILE, 'w').close()
-    #open(CONTAINER_FILE,'w').close()
-    #open(UPLOADED_FILE,'w').close()
-    
-    # If the credentials don't exist or are invalid run through the native client
-    # flow. The Storage object will ensure that if successful the good
-    # credentials will get written back to the file.
-    storage = file.Storage('sample.dat')
-    credentials = storage.get()
-    if credentials is None or credentials.invalid:
-        credentials = tools.run_flow(FLOW, storage, flags)
-    
-    # Create an httplib2.Http object to handle our HTTP requests and authorize it
-    # with our good Credentials.
-    http = httplib2.Http()
-    http = credentials.authorize(http)
-    
-    # Construct the service object for the interacting with the Google Maps Engine API.
-    service = discovery.build('mapsengine', 'v1', http=http)
-
-    #files = ["wdpa2014_id4336.tif"]
-    files = [ f for f in listdir(TO_UPLOAD_FOLDER) if isfile(join(TO_UPLOAD_FOLDER,f)) ]
-    
-    for f in files:
-        try:
-            logging.info("Starting upload for %s" % f)
-            result = upload(f,service)
-            
-            if result['code'] == NOT_STARTED_CODE:
-                msg = "%s: FAILURE: Not Started" % f
-                outputFile = NOT_STARTED_FILE
-   
-            elif result['code'] == CONTAINER_CODE:
-                msg = "%s: PARTIAL FAILURE: Asset container created but file not uploaded" % f
-                #move the file to a different folder so that it is easy to reprocess
-                shutil.move("%s/%s" % (TO_UPLOAD_FOLDER,f), "%s/%s" % (CONTAINER_FOLDER,f))
-                outputFile = CONTAINER_FILE
-                
-            elif result['code'] == UPLOADED_CODE:
-                msg = "%s: SUCCESS: Uploaded Successfully" % f
-                #move the file to the "processed" folder
-                shutil.move("%s/%s" % (TO_UPLOAD_FOLDER,f), "%s/%s" % (UPLOADED_FOLDER,f))
-                outputFile = UPLOADED_FILE
-            
-            with open(outputFile, 'a') as csvfile:
-                    writer = csv.writer(csvfile, delimiter=',',
-                                        quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
-                    writer.writerow([f,result['parkid'],result['assetid'],batchID]) 
-                    
-            print(msg)
-            logging.info(msg)
-            
-        except Exception:
-            msg = "%s: Critical Error" % f
-            print msg
-            logging.error(msg)
-            logging.error(sys.exc_info()[0])
-            logging.error(traceback.format_exc())
-    #end for
-    
-    msg = "Script Completed"
-    print msg
-    logging.info(msg)
+# def main(argv):
+#     # Parse the command-line flags.
+#     flags = parser.parse_args(argv[1:])
+#     
+#     logging.basicConfig(filename='logs/runlog.txt',level=logging.DEBUG, filemode='w', datefmt='%Y-%m-%d %H:%M:%S')
+#     
+#     #clear the contents of output files
+#     #open(NOT_STARTED_FILE, 'w').close()
+#     #open(CONTAINER_FILE,'w').close()
+#     #open(UPLOADED_FILE,'w').close()
+#     
+#     # If the credentials don't exist or are invalid run through the native client
+#     # flow. The Storage object will ensure that if successful the good
+#     # credentials will get written back to the file.
+#     storage = file.Storage('sample.dat')
+#     credentials = storage.get()
+#     if credentials is None or credentials.invalid:
+#         credentials = tools.run_flow(FLOW, storage, flags)
+#     
+#     # Create an httplib2.Http object to handle our HTTP requests and authorize it
+#     # with our good Credentials.
+#     http = httplib2.Http()
+#     http = credentials.authorize(http)
+#     
+#     # Construct the service object for the interacting with the Google Maps Engine API.
+#     service = discovery.build('mapsengine', 'v1', http=http)
+# 
+#     #files = ["wdpa2014_id4336.tif"]
+#     files = [ f for f in listdir(TO_UPLOAD_FOLDER) if isfile(join(TO_UPLOAD_FOLDER,f)) ]
+#     
+#     for f in files:
+#         try:
+#             logging.info("Starting upload for %s" % f)
+#             result = upload(f,service)
+#             
+#             if result['code'] == NOT_STARTED_CODE:
+#                 msg = "%s: FAILURE: Not Started" % f
+#                 outputFile = NOT_STARTED_FILE
+#    
+#             elif result['code'] == CONTAINER_CODE:
+#                 msg = "%s: PARTIAL FAILURE: Asset container created but file not uploaded" % f
+#                 #move the file to a different folder so that it is easy to reprocess
+#                 shutil.move("%s/%s" % (TO_UPLOAD_FOLDER,f), "%s/%s" % (CONTAINER_FOLDER,f))
+#                 outputFile = CONTAINER_FILE
+#                 
+#             elif result['code'] == UPLOADED_CODE:
+#                 msg = "%s: SUCCESS: Uploaded Successfully" % f
+#                 #move the file to the "processed" folder
+#                 shutil.move("%s/%s" % (TO_UPLOAD_FOLDER,f), "%s/%s" % (UPLOADED_FOLDER,f))
+#                 outputFile = UPLOADED_FILE
+#             
+#             with open(outputFile, 'a') as csvfile:
+#                     writer = csv.writer(csvfile, delimiter=',',
+#                                         quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+#                     writer.writerow([f,result['parkid'],result['assetid'],batchID]) 
+#                     
+#             print(msg)
+#             logging.info(msg)
+#             
+#         except Exception:
+#             msg = "%s: Critical Error" % f
+#             print msg
+#             logging.error(msg)
+#             logging.error(sys.exc_info()[0])
+#             logging.error(traceback.format_exc())
+#     #end for
+#     
+#     msg = "Script Completed"
+#     print msg
+#     logging.info(msg)
 # end main function
 
 # For more information on the Google Maps Engine API you can visit:
@@ -305,8 +305,8 @@ def main(argv):
 # For information on the Python Client Library visit:
 #
 #   https://developers.google.com/api-client-library/python/start/get_started
-if __name__ == '__main__':
-    main(sys.argv)
+# if __name__ == '__main__':
+#     main(sys.argv)
 
 ####### old code ########
         # now let's add the above dataset to a layer

@@ -26,6 +26,9 @@ _USER_ACCESS_ID = Config.get('Settings','UserAccessID')
 _WAIT = int(Config.get('Settings','APIWait'))
 _EEIDS_PATH = Config.get('Settings','EEIDSPath')
 _RUN_LOG_PATH = Config.get('Settings','RunLogPath')
+_TAG_FILE = ''
+if Config.has_option('OptionalSettings', 'TagFile'):
+    _TAG_FILE = Config.get('OptionalSettings', 'TagFile')
 
 #Internal constats
 _EEIDS_FILE = 'eeids.csv'
@@ -54,6 +57,18 @@ def main(argv):
     with open(eeidsfile, "w"):
         pass
     
+    #if a tag file is supplied, read it in
+    tagsf = []
+    if _TAG_FILE:
+        with open(_TAG_FILE) as f:
+            tagfile = csv.DictReader(f)
+            for t in tagfile:
+                tagsf.append(t)
+        
+    
+    type(tagfile)
+    print(tagsf)
+    
     logging.basicConfig(filename=runlogfile,level=logging.DEBUG, filemode='w', datefmt='%Y-%m-%d %H:%M:%S')
     service = uploadraster.service()
     #look for files with .tif extension
@@ -65,10 +80,16 @@ def main(argv):
     for f in files:
         
         #build up tags. Always include the automatic tag that the web ui creates (uploaded:ben.s.carlson@gmail.com:11/5/14)
-        # plus the file name (minus the extension), plus any tags included in the _TAGS property
+        # plus the file name (minus the extension), 
+        #plus any tags included in the _TAGS property, 
+        #plus any tags supplied in an optional tagfile
+        
         filename = f[:-4]
         tags = [tag1,filename] + _TAGS
-
+        for t in tagsf:
+            if t['filename'] == f:
+                tags = tags + t['tags'].split(',')
+        
         uploadsettings = {'name':filename,
                           'description': _DESCRIPTION,
                           'tags':tags,
